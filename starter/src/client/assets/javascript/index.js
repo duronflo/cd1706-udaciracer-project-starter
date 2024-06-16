@@ -2,6 +2,7 @@
 let store = {
 	track_id: undefined,
 	track_name: undefined,
+	track_segments: undefined,
 	player_id: undefined,
 	player_name: undefined,
 	race_id: undefined,
@@ -40,6 +41,7 @@ function setupClickHandlers() {
 			handleSelectTrack(target);
 			store.track_id = target.id;
 			store.track_name = target.innerHTML;
+			
 		}
 
 		// Racer form field
@@ -80,6 +82,11 @@ async function handleCreateRace() {
 
 	const player_id = store.player_id;
 	const track_id = store.track_id;
+	// get segmentlength of track to get proper race progress indication
+	const tracks = await getTracks();
+	const amountTrackSegment = tracks.find(item => item.id === parseInt(track_id)).segments.length
+
+	console.log(amountTrackSegment)
 	const race = await createRace(player_id, track_id);
 
 	console.log('RACE created :: ', race);
@@ -87,18 +94,20 @@ async function handleCreateRace() {
 
 	// The race has been created, now start the countdown
 	await runCountdown();
-
+	renderAt('#race', renderRaceRun(store.track_name));
 	await startRace(race.ID);
-	await runRace(race.ID);
+	
+	await runRace(race.ID, amountTrackSegment);
+
 }
 
-function runRace(raceID) {
+function runRace(raceID, amountTrackSegment) {
 	try {
 		return new Promise(resolve => {
 			const raceInterval = setInterval(async () => {
 				const race = await getRace(raceID);
 				if (race.status === 'in-progress') {
-					renderAt('#leaderBoard', raceProgress(race.positions));
+					renderAt('#leaderBoard', raceProgress(race.positions, amountTrackSegment));
 				} else if (race.status === 'finished') {
 					// stop the interval from repeating
 					clearInterval(raceInterval);
@@ -161,6 +170,7 @@ function handleSelectRacer(target) {
 
 function handleSelectTrack(target) {
 	// remove class selected from all track options
+	
 	const selected = document.querySelector('#tracks .selected');
 	if (selected) {
 		selected.classList.remove('selected');
@@ -240,6 +250,23 @@ function renderRaceStartView(track) {
 			<section id="leaderBoard">
 				${renderCountdown(3)}
 			</section>
+			
+			<section id="accelerate">
+			</section>
+
+		</main>
+		<footer></footer>
+	`;
+}
+
+function renderRaceRun(track) {
+	return `
+		<header>
+			<h1>Race: ${track}</h1>
+		</header>
+		<main id="two-columns">
+			<section id="leaderBoard"> 
+			</section >
 
 			<section id="accelerate">
 				<h2>Directions</h2>
@@ -289,19 +316,21 @@ function renderPositionCard(position, index) {
 	`;
 }
 
-function raceProgress(positions) {
+function raceProgress(positions, amountTrackSegment) {
 	let userPlayer = positions.find(e => e.id === parseInt(store.player_id));
 	userPlayer.driver_name += " (you)";
 
 	positions = positions.sort((a, b) => (a.segment > b.segment) ? -1 : 1);
 	let count = 1;
+	console.log(positions[0].segment);
+	console.log(amountTrackSegment)
+	const progress = Math.round((positions[positions.length-1].segment/amountTrackSegment)*100);
 
 	const results = positions.map(renderPositionCard);
-	console.log(positions)
 
 	return `
+		<h2> Progress: ${progress}% </h2>
 		<table>
-			${positions}
 			${results.join('')}
 		</table>
 	`;
